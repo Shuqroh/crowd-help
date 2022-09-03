@@ -18,24 +18,20 @@ contract CrowdHelpStorage {
     }
 
     enum CrowdRequestStatus {
-        Start,
+        Open,
         Completed
     }
 
     mapping(uint256 => CrowdRequest) crowdRequests;
     mapping(uint256 => mapping(address => uint256)) crowdRequestDonors;
 
-    function getCurrentRequestId() external view returns (uint256) {
-        return currentRequestId;
-    }
-
-    // Get crowd request status
-    function getRequestStatus(uint256 requestId)
-        external
-        view
-        returns (uint256)
-    {
-        return uint256(crowdRequests[requestId].status);
+    // Check if cycleId is valid
+    modifier isRequestIdValid(uint256 requestId) {
+        require(
+            requestId != 0 && requestId <= currentRequestId,
+            "Request ID must be within valid crowd help request range"
+        );
+        _;
     }
 
     // Create crowd help request
@@ -45,16 +41,18 @@ contract CrowdHelpStorage {
         uint256 amountNeeded,
         address owner
     ) external {
-        currentRequestId += 1;
+        currentRequestId.add(1);
         CrowdRequest storage request = crowdRequests[currentRequestId];
         request.title = title;
         request.description = description;
         request.owner = owner;
-        request.status = CrowdRequestStatus.Start;
+        request.status = CrowdRequestStatus.Open;
         request.amountNeeded = amountNeeded;
         request.totalWithdrawnAmount = 0;
         request.totalRaisedAmount = 0;
     }
+
+
 
     // Increase total amount raised in crowd help request
     function increaseTotalAmountRaised(uint256 requestId, uint256 amount)
@@ -86,6 +84,32 @@ contract CrowdHelpStorage {
         return totalWithdrawnAmount;
     }
 
+
+    // Update Esusu Status
+    function updateRequestStatus(uint256 requestId, uint256 status) external {
+        CrowdRequest storage request = crowdRequests[requestId];
+
+        request.status = CrowdRequestStatus(status);
+    }
+
+    // Add donor to request donor list
+    function createDonor(
+        uint256 requestId,
+        address member,
+        uint256 amount
+    ) external {
+        mapping(address => uint256) storage donor = crowdRequestDonors[
+            requestId
+        ];
+        donor[member] = amount;
+    }
+
+    //View functions
+
+    function getCurrentRequestId() external view returns (uint256) {
+        return currentRequestId;
+    }
+
     // Get crowd help request info
     function getRequestInfo(uint256 requestId)
         external
@@ -114,32 +138,13 @@ contract CrowdHelpStorage {
         );
     }
 
-    // Update Esusu Status
-    function updateRequestStatus(uint256 requestId, uint256 status) external {
-        CrowdRequest storage request = crowdRequests[requestId];
-
-        request.status = CrowdRequestStatus(status);
+    // Get crowd request status
+    function getRequestStatus(uint256 requestId)
+        external
+        view
+        returns (uint256)
+    {
+        return uint256(crowdRequests[requestId].status);
     }
 
-    // Add donor to request donor list
-    function createDonor(
-        uint256 requestId,
-        address member,
-        uint256 amount
-    ) external {
-        mapping(address => uint256) storage donor = crowdRequestDonors[
-            requestId
-        ];
-        donor[member] = amount;
-    }
-
-
-    // Check if cycleId is valid
-    modifier isRequestIdValid(uint256 requestId) {
-        require(
-            requestId != 0 && requestId <= currentRequestId,
-            "Request ID must be within valid crowd help request range"
-        );
-        _;
-    }
 }

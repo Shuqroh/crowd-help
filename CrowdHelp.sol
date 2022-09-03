@@ -15,15 +15,11 @@ contract CrowdHelp is Ownable, ERC20 {
     CrowdHelpStorage _crowdHelpStorage;
 
     enum CrowdRequestStatus {
-        Start,
+        Open,
         Completed
     }
 
-    // Contract owner
-    address payable public admin;
-
     constructor(uint256 _quantity) ERC20("CrowdHelp Token", "CDHT") {
-        admin = payable(msg.sender);
         address _to = address(this);
         _mint(_to, _quantity);
     }
@@ -41,14 +37,26 @@ contract CrowdHelp is Ownable, ERC20 {
     // withdraw event
     event WithdrawEvent(uint256 date, uint256 requestId, address indexed owner);
 
+    modifier amountNotZero(uint _amount){
+        require(_amount > 0, "Amount can't be Zero");
+        _;
+    }
+
+    modifier ifExists(uint requestId){
+        require(
+            requestId > 0 && requestId <= currentRequestId,
+            "Request ID must be within valid Crowd Request range"
+        );
+        _;
+    }
+
     // Create request for user
     function createCrowdRequest(
         string calldata title,
         string calldata description,
         uint256 amountNeeded,
         address owner
-    ) external {
-        require(amountNeeded > 0, "Amount Needed Can't Be Zero");
+    ) external amountNotZero(amountNeeded){
 
         _crowdHelpStorage.createRequest(
             title,
@@ -64,16 +72,11 @@ contract CrowdHelp is Ownable, ERC20 {
     function donateHelpToRequest(uint256 requestId, uint256 amount)
         public
         payable
+        amountNotZero(amount)
+        ifExists(requestId)
     {
-        require(amount > 0, "Donate Amount Can't Be Zero");
 
         uint256 currentRequestId = _crowdHelpStorage.getCurrentRequestId();
-
-        //  Check if the request ID is valid
-        require(
-            requestId > 0 && requestId <= currentRequestId,
-            "Request ID must be within valid Crowd Request range"
-        );
 
         //  Get the request info
 
@@ -86,6 +89,8 @@ contract CrowdHelp is Ownable, ERC20 {
             uint256 status,
             address owner
         ) = _crowdHelpStorage.getRequestInfo(requestId);
+
+        require(msg.sender != owner, "Owner cannot donate");
 
         // If request is completed, bounce back
         require(
@@ -124,16 +129,10 @@ contract CrowdHelp is Ownable, ERC20 {
     }
 
     // Donate help to crowd help request
-    function withdrawFromRequest(uint256 requestId, uint256 amount) external {
+    function withdrawFromRequest(uint256 requestId, uint256 amount) external ifExists(requestId) {
         require(amount > 0, "Withdraw Amount Can't Be Zero");
 
         uint256 currentRequestId = _crowdHelpStorage.getCurrentRequestId();
-
-        //  Check if the request ID is valid
-        require(
-            requestId > 0 && requestId <= currentRequestId,
-            "Request ID must be within valid Crowd Request range"
-        );
 
         //  Get the Request info
 
@@ -149,13 +148,13 @@ contract CrowdHelp is Ownable, ERC20 {
 
         //  Check user is the request owner
         require(
-            owner != msg.sender,
-            "You dont have access to withdraw this fund"
+            owner == msg.sender,
+            "You don't have access to withdraw this fund"
         );
 
         // If totalRaisedAmount is 0, bounce back
         require(
-            totalRaisedAmount == 0,
+            totalRaisedAmount != 0,
             "Unable to proceed for withdraw, no amount raise yet"
         );
 
